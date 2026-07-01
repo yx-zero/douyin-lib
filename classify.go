@@ -25,7 +25,7 @@ type contentJSON struct {
 	AweType     *int         `json:"aweType"`
 	Text        string       `json:"text"`
 	Description string       `json:"description"`
-	Duration    float64      `json:"duration"`
+	Duration    json.Number  `json:"duration"` // string OR number in the wild (voice=ms int, video=sec float string)
 	AiAudioText string       `json:"ai_audio_text"`
 	DisplayName string       `json:"display_name"`
 	PushDetail  string       `json:"push_detail"`
@@ -94,6 +94,21 @@ func stripWhitespace(s string) string {
 	return strings.NewReplacer("\r", "", "\n", "", " ", "").Replace(s)
 }
 
+// durationMs interprets the polymorphic "duration" field (string or number) as
+// milliseconds. Voice messages use an integer ms value; other message types may
+// use a float-seconds string that we don't rely on here (returns its numeric
+// value regardless, callers only use it for voice).
+func durationMs(n json.Number) float64 {
+	if n == "" {
+		return 0
+	}
+	f, err := n.Float64()
+	if err != nil {
+		return 0
+	}
+	return f
+}
+
 // classify turns a rawMessage into a Message. Returns ok=false for messages
 // that should be skipped (recalled, or empty/no-content).
 func classify(m *rawMessage, myUID string) (Message, bool) {
@@ -147,12 +162,13 @@ func classify(m *rawMessage, myUID string) (Message, bool) {
 	}
 
 	// Voice: typeCode 17, OR content has resource_url + duration.
-	hasVoice := m.typeCode == 17 || (cj.ResourceURL != nil && cj.Duration > 0)
+	durMs := durationMs(cj.Duration)
+	hasVoice := m.typeCode == 17 || (cj.ResourceURL != nil && durMs > 0)
 	if hasVoice && cj.ResourceURL != nil {
 		base.Kind = KindVoice
 		base.Text = strings.TrimSpace(cj.AiAudioText) // may be overridden by live transcription
 		base.VoiceURI = cj.ResourceURL.URI
-		base.Duration = time.Duration(cj.Duration) * time.Millisecond
+		base.Duration = time.Duration(durMs) * time.Millisecond
 		base.MediaURL = firstURL(cj.ResourceURL.URLList)
 		return base, true
 	}

@@ -68,7 +68,11 @@ func (c *Client) videoPlayURL(ctx context.Context, vid string) (string, error) {
 		"req_infos":    []map[string]any{{"item_id": 0, "tos_key": tosKey, "type": 2}},
 		"with_caption": true,
 	})
-	endpoint := urlBatchPlayInfo + "?" + c.webParams().Encode()
+	// batch_play_info requires app_name=douyin_web; without it the server returns
+	// err_no=5 "参数不合法" (verified 2026-07-01).
+	q := c.webParams()
+	q.Set("app_name", "douyin_web")
+	endpoint := urlBatchPlayInfo + "?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", err

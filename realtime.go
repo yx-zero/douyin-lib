@@ -24,9 +24,10 @@ type Realtime struct {
 	cancel    context.CancelFunc
 	closeOnce sync.Once
 
-	mu   sync.Mutex
-	err  error
-	seen map[string]bool // dedup by frontier msg id
+	mu      sync.Mutex
+	err     error
+	seen    map[string]bool // dedup by frontier msg id
+	emitted map[string]bool // dedup by server message id (for HTTP-fetched media)
 }
 
 // RealtimeOption configures a Realtime stream.
@@ -61,10 +62,11 @@ func (c *Client) Realtime(ctx context.Context, opts ...RealtimeOption) (*Realtim
 
 	rctx, cancel := context.WithCancel(ctx)
 	rt := &Realtime{
-		client: c,
-		events: make(chan Event, 64),
-		cancel: cancel,
-		seen:   map[string]bool{},
+		client:  c,
+		events:  make(chan Event, 64),
+		cancel:  cancel,
+		seen:    map[string]bool{},
+		emitted: map[string]bool{},
 	}
 	go rt.run(rctx, cfg)
 	return rt, nil
@@ -213,7 +215,14 @@ func (rt *Realtime) handleFrame(ctx context.Context, data []byte) {
 		return
 	}
 
+	// Media messages (image/video/…) are NOT delivered inline over the WS — the
+	// frame is only a "you have a new message" notification with no content JSON
+	// (just metadata: sender, conv_id, server_message_create_time). Detect that
+	// and fetch the real message over HTTP, where it classifies correctly.
 	if pp.contentJSON == "" {
+		if pp.convID != "" && pp.senderSecUID != "" && pp.ext["s:server_message_create_time"] != "" {
+			rt.fetchAndEmit(ctx, pp)
+		}
 		return
 	}
 
@@ -268,7 +277,49 @@ func (rt *Realtime) handleFrame(ctx context.Context, data []byte) {
 			m.Timestamp = time.Now()
 		}
 	}
+	// Record so a later media-notification fetch won't re-emit this inline message.
+	if m.ServerID != "" {
+		rt.mu.Lock()
+		if rt.emitted[m.ServerID] {
+			rt.mu.Unlock()
+			return
+		}
+		rt.emitted[m.ServerID] = true
+		rt.mu.Unlock()
+	}
 	rt.emit(ctx, Event{Type: EventNewMessage, Message: &m})
+}
+
+// fetchAndEmit handles a media-notification frame (empty content JSON) by
+// pulling the conversation's most recent messages over HTTP — where images and
+// videos classify correctly — and emitting any we haven't emitted before.
+// This is what makes image/video (and any non-inline media) reach receivers.
+func (rt *Realtime) fetchAndEmit(ctx context.Context, pp pushPayload) {
+	conv, err := rt.client.ConversationByID(ctx, pp.convID)
+	if err != nil || conv == nil {
+		return
+	}
+	msgs, err := rt.client.GetMessages(ctx, conv, MessageOptions{Range: RangeLast, Count: 5})
+	if err != nil || len(msgs) == 0 {
+		return
+	}
+	// GetMessages returns chronological order; only emit ones not seen before.
+	for i := range msgs {
+		m := &msgs[i]
+		if m.ServerID == "" {
+			continue
+		}
+		rt.mu.Lock()
+		if rt.emitted[m.ServerID] {
+			rt.mu.Unlock()
+			continue
+		}
+		rt.emitted[m.ServerID] = true
+		rt.mu.Unlock()
+
+		mm := *m
+		rt.emit(ctx, Event{Type: EventNewMessage, Message: &mm})
+	}
 }
 
 func atoiSafe(s string) int64 {

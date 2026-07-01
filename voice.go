@@ -7,10 +7,41 @@ package douyinim
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
 const transcribeChunk = 5
+
+// TranscribeVoice transcribes a single voice Message to text via Douyin's ASR
+// endpoint and returns the recognized text (empty if the server had none). The
+// message must be a voice message (Kind == KindVoice) with VoiceURI/SenderSecID
+// set; conv supplies the required conv_short_id. This is the same ASR that
+// GetMessages(TranscribeVoice:true) uses, exposed for transcribing one message
+// on its own (e.g. a voice received over the realtime stream).
+func (c *Client) TranscribeVoice(ctx context.Context, conv *Conversation, m *Message) (string, error) {
+	if m == nil || m.Kind != KindVoice {
+		return "", fmt.Errorf("not a voice message")
+	}
+	if m.VoiceURI == "" || m.SenderSecID == "" {
+		return "", fmt.Errorf("voice message missing uri/sender")
+	}
+	if conv == nil || conv.Cursor == "" {
+		return "", fmt.Errorf("conversation missing cursor (conv_short_id)")
+	}
+	endpoint := urlRecog + "?" + c.webParams().Encode()
+	results, err := c.transcribeOne(ctx, endpoint, []recogReqItem{{
+		URI:         m.VoiceURI,
+		SecUID:      m.SenderSecID,
+		MessageID:   m.ServerID,
+		MessageType: 17,
+		ConvShortID: conv.Cursor,
+	}})
+	if err != nil {
+		return "", err
+	}
+	return results[m.ServerID], nil
+}
 
 type recogReqItem struct {
 	URI         string `json:"uri"`

@@ -18,7 +18,7 @@
 | 拉取会话列表（含火花） | `Conversations` |
 | 按昵称 / @号 / uid 查找会话 | `FindConversation` |
 | 读取历史消息（可分段） | `GetMessages` |
-| 语音转文字（抖音 ASR） | `GetMessages` 传 `TranscribeVoice: true` |
+| 语音转文字（抖音 ASR） | `GetMessages` 传 `TranscribeVoice: true`，或 `TranscribeVoice` 转单条 |
 | 图片 / 贴纸 / 分享 / 引用回复 | 在 `GetMessages` 中自动归类 |
 | 火花天数 + 今日状态 | `Conversation.Spark` |
 | 拉取收藏 / 自定义表情 | `FavoriteStickers` |
@@ -248,7 +248,9 @@ for ev := range rt.Events() {
 ```
 
 - **新消息**以 `EventNewMessage` 到达（`ev.Message`，和历史消息同一个 `Message` 类型），
-  并带 `IsMe`，机器人不会回复自己发的消息。
+  并带 `IsMe`，机器人不会回复自己发的消息。文本直接内联在 WS 帧里；图片/视频等媒体消息
+  WS 只推通知，库会自动经 HTTP 补全后再作为 `EventNewMessage` 推出，所以收到的媒体消息
+  已带好 `VideoID`/`ImageSKey` 等字段，可直接 `DownloadVideo`/`DownloadImage`。
 - **已读回执**以 `EventReadReceipt` 到达 —— 是按会话的已读**水位线**（`ReadIndex`）；
   当某个参与者的 `ReadIndex` 追上一条消息，就说明这条被读了。`IsMe` 用于区分是你自己的多端同步还是对方已读。
 - **撤回**以 `EventRecall` 到达（`ev.Recall`）—— 带被撤回消息的 `TargetServerMessageID`（对应先前某条 `Message.ServerID`），
