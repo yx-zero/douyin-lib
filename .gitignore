@@ -1,0 +1,43 @@
+# === 敏感信息（切勿提交）===
+# 登录 Cookie —— 包含你的抖音会话凭证，泄露即等于账号被盗
+cookies.txt
+*.cookies
+cookies*.txt
+
+# 抓包 / 调试产物，可能含 Cookie、sec_uid、私信内容
+*.har
+*.pcap
+
+# === 编译产物 ===
+# example 目录里编译出的可执行文件
+/example/example
+example/example
+# Go 常规二进制 / 测试产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# === 运行期下载/生成的测试文件（可能含他人私信媒体，勿提交）===
+downloaded_*
+live_*
+*.webp
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.mp4
+
+# === 编辑器 / 系统 ===
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Go workspace
+go.work
+go.work.sum
