@@ -1,4 +1,4 @@
-module github.com/yxzero/douyinim
+module github.com/yx-zero/douyin-lib
 
 go 1.23
 

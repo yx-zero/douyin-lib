@@ -1,4 +1,4 @@
-# douyinim
+# douyin-lib
 
 一个**纯协议**的抖音网页版**私信（IM）** Go 库 —— 拉取会话列表、读取历史消息
 （文本 / 图片 / 语音 / 表情贴纸 / 分享）、把语音转成文字、查看**火花**状态、
@@ -37,7 +37,7 @@
 ## 安装
 
 ```bash
-go get github.com/yxzero/douyinim
+go get github.com/yx-zero/douyin-lib
 ```
 
 需要 Go 1.23+。
@@ -51,7 +51,7 @@ import (
 	"context"
 	"fmt"
 
-	dy "github.com/yxzero/douyinim"
+	dy "github.com/yx-zero/douyin-lib"
 )
 
 func main() {

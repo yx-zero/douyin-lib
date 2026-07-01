@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	dy "github.com/yxzero/douyinim"
+	dy "github.com/yx-zero/douyin-lib"
 )
 
 func main() {
