@@ -202,6 +202,8 @@ const (
 	EventNewMessage EventType = "new_message"
 	// EventReadReceipt: a conversation read watermark moved (Event.ReadReceipt set).
 	EventReadReceipt EventType = "read_receipt"
+	// EventRecall: a message was recalled/撤回 (Event.Recall set).
+	EventRecall EventType = "recall"
 	// EventConnected: the WebSocket (re)connected.
 	EventConnected EventType = "connected"
 	// EventDisconnected: the WebSocket dropped (Event.Err may say why; auto-reconnect follows).
@@ -213,7 +215,19 @@ type Event struct {
 	Type        EventType
 	Message     *Message     // set for EventNewMessage
 	ReadReceipt *ReadReceipt // set for EventReadReceipt
+	Recall      *Recall      // set for EventRecall
 	Err         error        // set for EventDisconnected
+}
+
+// Recall is a message-recall (撤回) push. The recalled message is identified by
+// TargetServerMessageID within ConvID; correlate it with a message you received
+// earlier (Message.ServerID) to remove/mark it.
+type Recall struct {
+	ConvID                string
+	TargetServerMessageID string // ServerID of the message that was recalled
+	TargetClientMessageID string // the recalled message's client id, if present
+	RecallUID             string // uid of whoever recalled (from s:recall_uid)
+	IsMe                  bool   // the recall was performed by you
 }
 
 // ReadReceipt is a conversation read-watermark update. A sent message is "read"

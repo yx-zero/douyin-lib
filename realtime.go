@@ -193,6 +193,26 @@ func (rt *Realtime) handleFrame(ctx context.Context, data []byte) {
 		return
 	}
 	pp := extractPush(fr.payload)
+
+	// Recall (撤回): signalled purely via the ext map (content JSON is "{}"), so
+	// check it before the content-based branches below. The server pushes several
+	// frames per recall; only the one carrying the target message id is useful.
+	if pp.ext["s:is_recalled"] == "true" {
+		target := pp.ext["s:target_server_message_id"]
+		if target == "" {
+			return
+		}
+		recallUID := pp.ext["s:recall_uid"]
+		rt.emit(ctx, Event{Type: EventRecall, Recall: &Recall{
+			ConvID:                pp.convID,
+			TargetServerMessageID: target,
+			TargetClientMessageID: pp.ext["s:target_client_message_id"],
+			RecallUID:             recallUID,
+			IsMe:                  recallUID != "" && recallUID == rt.client.myUID,
+		}})
+		return
+	}
+
 	if pp.contentJSON == "" {
 		return
 	}

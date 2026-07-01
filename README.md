@@ -27,7 +27,7 @@
 | 发送表情贴纸 | `SendSticker` / `SendFavoriteSticker` / `SendContentJSON` |
 | 撤回消息 | `RecallMessage` / `RecallMessageByID` |
 | 下载并解密图片 | `DownloadImage` / `DecryptImage` |
-| 实时推送（新消息、已读回执） | `Realtime` |
+| 实时推送（新消息、已读回执、撤回） | `Realtime` |
 | 已读状态（对方读到哪了） | `ReadIndex` / `PeerRead` / `WasRead` |
 
 所有接口都走 Cookie 鉴权、纯 HTTP，落在 `imapi.douyin.com` 与 `www.douyin.com`。
@@ -219,6 +219,9 @@ for ev := range rt.Events() {
 		}
 	case dy.EventReadReceipt:
 		// ev.ReadReceipt.ReaderSecID 已读到 ev.ReadReceipt.ReadIndex
+	case dy.EventRecall:
+		// 有消息被撤回：ev.Recall.TargetServerMessageID 是被撤回消息的 ServerID
+		// ev.Recall.IsMe=false 表示是对方撤回的
 	case dy.EventConnected, dy.EventDisconnected:
 		// 连接生命周期
 	}
@@ -229,6 +232,8 @@ for ev := range rt.Events() {
   并带 `IsMe`，机器人不会回复自己发的消息。
 - **已读回执**以 `EventReadReceipt` 到达 —— 是按会话的已读**水位线**（`ReadIndex`）；
   当某个参与者的 `ReadIndex` 追上一条消息，就说明这条被读了。`IsMe` 用于区分是你自己的多端同步还是对方已读。
+- **撤回**以 `EventRecall` 到达（`ev.Recall`）—— 带被撤回消息的 `TargetServerMessageID`（对应先前某条 `Message.ServerID`），
+  `IsMe` 区分是你还是对方撤回的。撤回本身不携带原文，所以要「反撤回」需在收到消息的当下就缓存内容（图片更要即时 `DownloadImage`，撤回后 CDN 资源可能失效）。
 - 事件流自带退避重连；`Events()` 只有在你 `Close()` 时（或 `WithReconnect(false)` 且连接断开时）才会关闭。心跳在内部处理。
 
 示例 CLI 里的 `listen`（打印实时事件）和 `pong`（ping→pong 机器人）演示了这个能力。

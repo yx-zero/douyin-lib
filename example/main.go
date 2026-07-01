@@ -318,6 +318,13 @@ func cmdListen(ctx context.Context, c *dy.Client) {
 				who = "me"
 			}
 			fmt.Printf("[read] conv=%s by=%s read_index=%d unread=%d\n", short(r.ConvID), who, r.ReadIndex, r.BadgeCount)
+		case dy.EventRecall:
+			r := ev.Recall
+			who := "peer"
+			if r.IsMe {
+				who = "me"
+			}
+			fmt.Printf("[recall] conv=%s by=%s target_msg=%s\n", short(r.ConvID), who, r.TargetServerMessageID)
 		}
 	}
 	if err := rt.Err(); err != nil {
