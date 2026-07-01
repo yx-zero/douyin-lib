@@ -60,6 +60,7 @@ const (
 	KindVoice   MessageKind = "voice"
 	KindSticker MessageKind = "sticker"
 	KindImage   MessageKind = "image"
+	KindVideo   MessageKind = "video"
 	KindShare   MessageKind = "share"
 	KindSystem  MessageKind = "system"
 	KindOther   MessageKind = "other"
@@ -95,6 +96,12 @@ type Message struct {
 	// Image (Kind == KindImage). Encrypted images need DecryptImage / the SKey.
 	ImageSKey  string // AES-256-GCM key (hex) to decrypt MediaURL bytes; empty if unencrypted
 	InlineWebP []byte // small unencrypted WebP thumbnail embedded in the message, if any
+
+	// Video (Kind == KindVideo). The video itself is fetched+decrypted via
+	// DownloadVideo using VideoID; VideoSKey is the CENC key. MediaURL/InlineWebP
+	// point at the poster (cover) image.
+	VideoID   string // vid, used to resolve a playable URL via batch_play_info
+	VideoSKey string // CENC (AES-CTR) key (hex) to decrypt the fetched MP4
 
 	// Quoted/replied message, if any
 	Reply *Reply

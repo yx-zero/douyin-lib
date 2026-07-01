@@ -27,6 +27,7 @@
 | 发送表情贴纸 | `SendSticker` / `SendFavoriteSticker` / `SendContentJSON` |
 | 撤回消息 | `RecallMessage` / `RecallMessageByID` |
 | 下载并解密图片 | `DownloadImage` / `DecryptImage` |
+| 下载并解密视频（CENC） | `DownloadVideo` |
 | 实时推送（新消息、已读回执、撤回） | `Realtime` |
 | 已读状态（对方读到哪了） | `ReadIndex` / `PeerRead` / `WasRead` |
 
@@ -124,6 +125,7 @@ type Spark struct {
 - `KindText` —— 纯文本
 - `KindVoice` —— 含 `Duration` 与 `VoiceURI`；开启转写后 `Text` 为识别结果，`MediaURL` 为可播放的签名地址
 - `KindImage` —— `MediaURL` 是（加密的）图片，`ImageSKey` 用于解密，`InlineWebP` 是可即时展示的缩略图
+- `KindVideo` —— 直接发的短视频；`VideoID`+`VideoSKey` 交给 `DownloadVideo` 取址下载并 CENC 解密，`MediaURL`/`InlineWebP` 是封面
 - `KindSticker` —— `Text` 为贴纸展示名（若有），`Sticker` 保留完整原始负载，`MediaURL` 为图片地址
 - `KindShare` —— 分享的视频 / 商品 / 链接，`Text` 为描述
 - `KindSystem` —— 系统通知
@@ -183,6 +185,23 @@ os.WriteFile("image"+format.Ext, data, 0644)         // .jpg/.png/.webp/.heic/.m
 
 如需离线使用，`DecryptImage(encryptedBytes, skeyHex)` 只做解密这一步：
 `key = hex(skey)`（32 字节 AES-256），`iv = bytes[:12]`，其余部分带 GCM tag。
+
+## 加密视频
+
+抖音私信里直接发的短视频（消息 `Kind == KindVideo`，`typeCode 30`）以 **CENC
+（scheme `cenc`，AES-CTR）加密的 MP4** 传输：明文容器 + 加密画面。本库一步到位：
+
+```go
+data, err := client.DownloadVideo(ctx, &msg) // 取址 + 下载 + CENC 解密
+os.WriteFile("video.mp4", data, 0644)        // 明文可播放 MP4
+```
+
+`DownloadVideo` 内部：用消息里的 `VideoID`（vid）经 `batch_play_info` 换取可播放
+CDN 地址（cookie-only，无需 a_bogus），下载后用 `VideoSKey`（CENC key）逐 sample
+AES-CTR 解密，并把 sample entry 的 fourcc 从 `encv`/`enca` 还原为原始编码
+（`hvc1`/`mp4a` 等），得到明文 MP4。视频消息的 `MediaURL` / `InlineWebP` 指向封面图。
+
+> 视频取址用的 CDN 地址有时效，建议收到消息即时下载（这也是防撤回场景的必要做法）。
 
 ## 撤回消息
 

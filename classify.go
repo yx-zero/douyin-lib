@@ -35,6 +35,26 @@ type contentJSON struct {
 	ResourceURL *resourceURL `json:"resource_url"`
 	URL         *urlList     `json:"url"`
 	CoverURL    *urlList     `json:"cover_url"`
+	Video       *videoInfo   `json:"video"`  // IM video (typeCode 30): vid + CENC skey
+	Poster      *posterInfo  `json:"poster"` // video cover image
+}
+
+// videoInfo is the "video" object in an IM video message content.
+type videoInfo struct {
+	VID          string `json:"vid"`
+	SKey         string `json:"skey"`
+	TKey         string `json:"tkey"`
+	MD5          string `json:"md5"`
+	IsNewEncrypt int    `json:"is_new_encrypt"`
+}
+
+// posterInfo is the "poster" cover image for a video message.
+type posterInfo struct {
+	MD5          string   `json:"md5"`
+	MediumURLs   []string `json:"medium_url_list"`
+	OriginURLs   []string `json:"origin_url_list"`
+	LargeURLs    []string `json:"large_url_list"`
+	ThumbURLs    []string `json:"thumb_url_list"`
 }
 
 type resourceURL struct {
@@ -178,6 +198,30 @@ func classify(m *rawMessage, myUID string) (Message, bool) {
 			}
 		}
 		return base, true
+	}
+
+	// Video (typeCode 30): content has a "video" object with vid + CENC skey.
+	// The message itself carries a poster (cover) image + inline thumbnail.
+	if m.typeCode == 30 || cj.Video != nil {
+		if cj.Video != nil && cj.Video.VID != "" {
+			base.Kind = KindVideo
+			base.VideoID = cj.Video.VID
+			base.VideoSKey = cj.Video.SKey
+			if text == "" {
+				text = "[视频]"
+			}
+			base.Text = text
+			if cj.Poster != nil {
+				base.MediaURL = firstURL(cj.Poster.MediumURLs, cj.Poster.LargeURLs,
+					cj.Poster.OriginURLs, cj.Poster.ThumbURLs)
+			}
+			if cj.InlinePic != "" {
+				if raw, err := base64.StdEncoding.DecodeString(stripWhitespace(cj.InlinePic)); err == nil {
+					base.InlineWebP = raw
+				}
+			}
+			return base, true
+		}
 	}
 
 	if shareVideo[aweType] {
